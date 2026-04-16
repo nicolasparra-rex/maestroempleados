@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import re
 from datetime import datetime
 import io
 
@@ -7,8 +8,6 @@ st.set_page_config(page_title="Validador de Empleados", page_icon="📋", layout
 
 st.title("📋 Validador de Empleados")
 st.markdown("Sube el archivo `.xlsm` para validar y corregir los datos.")
-
-# ─── CONFIGURACIÓN ───────────────────────────────────────────
 
 campos_obligatorios = [
     "Id empleado", "Situación", "Nombres", "Apellido paterno", "Apellido materno",
@@ -55,8 +54,6 @@ formatos_posibles = [
     "%Y/%m/%d", "%d-%m-%y", "%d/%m/%y", "%m/%d/%Y",
 ]
 
-# ─── FUNCIONES ───────────────────────────────────────────────
-
 def convertir_fecha(valor):
     if pd.isna(valor) or str(valor).strip() == "":
         return valor
@@ -96,6 +93,11 @@ def validar_corregir_id(valor):
         return id_str
     return valor
 
+def limpiar_direccion(valor):
+    if pd.isna(valor) or str(valor).strip() == "":
+        return valor
+    return re.sub(r'[^a-zA-ZáéíóúÁÉÍÓÚñÑ0-9 ]', '', str(valor).strip())
+
 def procesar_archivo(uploaded_file):
     df = pd.read_excel(uploaded_file, sheet_name="Empleados", dtype=str)
     total_original = len(df)
@@ -113,6 +115,11 @@ def procesar_archivo(uploaded_file):
     for campo in campos_fecha:
         if campo in df.columns:
             df[campo] = df[campo].apply(convertir_fecha)
+
+    campos_direccion = ["Nombre Calle", "Numero Calle", "Departamento"]
+    for campo in campos_direccion:
+        if campo in df.columns:
+            df[campo] = df[campo].apply(limpiar_direccion)
 
     errores = []
     for idx, fila in df.iterrows():
@@ -141,8 +148,6 @@ def procesar_archivo(uploaded_file):
 
     return df, errores, total_original, filas_eliminadas
 
-# ─── INTERFAZ ────────────────────────────────────────────────
-
 archivo = st.file_uploader("Selecciona el archivo Excel", type=["xlsm", "xlsx"])
 
 if archivo:
@@ -170,7 +175,6 @@ if archivo:
             else:
                 st.success("Todo correcto! No hay errores en el archivo.")
 
-            # Reporte txt
             reporte_txt = "REPORTE DE VALIDACION\n" + "=" * 60 + "\n\n"
             if errores:
                 reporte_txt += f"ERRORES ENCONTRADOS - {len(errores)} fila(s) con problemas\n\n"
@@ -184,7 +188,6 @@ if archivo:
             else:
                 reporte_txt += "Todo correcto! No hay errores.\n"
 
-            # Excel corregido en memoria
             buffer = io.BytesIO()
             df.to_excel(buffer, index=False)
             buffer.seek(0)

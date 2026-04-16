@@ -98,6 +98,11 @@ def limpiar_direccion(valor):
         return valor
     return re.sub(r'[^a-zA-ZáéíóúÁÉÍÓÚñÑ0-9 ]', '', str(valor).strip())
 
+def convertir_email_minuscula(valor):
+    if pd.isna(valor) or str(valor).strip() == "":
+        return valor
+    return str(valor).strip().lower()
+
 def procesar_archivo(uploaded_file):
     df = pd.read_excel(uploaded_file, sheet_name="Empleados", dtype=str)
     total_original = len(df)
@@ -106,21 +111,38 @@ def procesar_archivo(uploaded_file):
         df = df[df["Situación"].str.strip().str.upper() == "A"]
     filas_eliminadas = total_original - len(df)
 
+    # Corregir Id empleado
     if "Id empleado" in df.columns:
         df["Id empleado"] = df["Id empleado"].apply(validar_corregir_id)
+
+    # Reemplazar centro de costo y sede
     if "Id centro de costo" in df.columns:
         df["Id centro de costo"] = "sinDefinir"
     if "Id sede donde se desempeña" in df.columns:
         df["Id sede donde se desempeña"] = "sinDefinir"
+
+    # Convertir fechas
     for campo in campos_fecha:
         if campo in df.columns:
             df[campo] = df[campo].apply(convertir_fecha)
 
+    # Limpiar caracteres inválidos en dirección
     campos_direccion = ["Nombre Calle", "Numero Calle", "Departamento"]
     for campo in campos_direccion:
         if campo in df.columns:
             df[campo] = df[campo].apply(limpiar_direccion)
 
+    # Rellenar comuna con ceros a la izquierda hasta 5 caracteres
+    if "Comuna" in df.columns:
+        df["Comuna"] = df["Comuna"].apply(lambda x: str(x).strip().zfill(5) if pd.notna(x) and str(x).strip() != "" else x)
+
+    # Convertir emails a minúscula
+    campos_email = ["Email institucional", "Email personal"]
+    for campo in campos_email:
+        if campo in df.columns:
+            df[campo] = df[campo].apply(convertir_email_minuscula)
+
+    # Validaciones
     errores = []
     for idx, fila in df.iterrows():
         num_fila = idx + 2

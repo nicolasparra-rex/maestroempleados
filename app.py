@@ -40,44 +40,30 @@ def _cargar_logo_base64():
 
 CSS_PERSONALIZADO = """
 <style>
-    /* ═══ Tipografía global ═══ */
     html, body, [class*="css"] {
         font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     }
 
-    /* ═══ Ocultar elementos de Streamlit ═══ */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
     header {visibility: hidden;}
 
-    /* ═══ Contenedor principal ═══ */
     .main .block-container {
-        padding-top: 0 !important;
+        padding-top: 2rem !important;
         padding-left: 2rem;
         padding-right: 2rem;
         max-width: 1400px;
     }
 
-    /* ═══ Header personalizado Rex+ ═══ */
     .rex-header {
         background: linear-gradient(135deg, #1A3A5F 0%, #2E5A8C 100%);
         padding: 1.25rem 2rem;
-        margin: -6rem -100vw 2rem -100vw;
-        padding-left: calc(100vw - 50%);
-        padding-right: calc(100vw - 50%);
+        margin-bottom: 2rem;
         display: flex;
         align-items: center;
         justify-content: space-between;
+        border-radius: 12px;
         box-shadow: 0 2px 8px rgba(26, 58, 95, 0.15);
-    }
-
-    .rex-header-inner {
-        max-width: 1400px;
-        margin: 0 auto;
-        width: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
     }
 
     .rex-header-left {
@@ -116,7 +102,6 @@ CSS_PERSONALIZADO = """
         letter-spacing: 0.3px;
     }
 
-    /* ═══ Hero / Título principal ═══ */
     .rex-hero {
         margin: 0 0 2rem 0;
         padding: 0;
@@ -136,36 +121,6 @@ CSS_PERSONALIZADO = """
         margin: 0;
     }
 
-    /* ═══ Cards de secciones ═══ */
-    .rex-card {
-        background: white;
-        border: 1px solid #E8EEF3;
-        border-radius: 12px;
-        padding: 1.5rem;
-        margin-bottom: 1.5rem;
-        box-shadow: 0 1px 3px rgba(26, 58, 95, 0.04);
-    }
-
-    .rex-section-title {
-        color: #1A3A5F;
-        font-size: 1rem;
-        font-weight: 600;
-        margin: 2rem 0 1rem 0;
-        letter-spacing: 0.2px;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    .rex-section-title::before {
-        content: "";
-        width: 4px;
-        height: 20px;
-        background: #1EBBEF;
-        border-radius: 2px;
-    }
-
-    /* ═══ Métricas ═══ */
     [data-testid="stMetric"] {
         background: white;
         border: 1px solid #E8EEF3;
@@ -183,7 +138,6 @@ CSS_PERSONALIZADO = """
         color: #8B9DAE !important;
         font-size: 0.8rem !important;
         font-weight: 500 !important;
-        letter-spacing: 0.2px;
     }
     [data-testid="stMetricValue"] {
         color: #1A3A5F !important;
@@ -191,7 +145,6 @@ CSS_PERSONALIZADO = """
         font-weight: 700 !important;
     }
 
-    /* ═══ File Uploader ═══ */
     [data-testid="stFileUploader"] section {
         background: #F5F9FC;
         border: 2px dashed #1EBBEF !important;
@@ -209,13 +162,11 @@ CSS_PERSONALIZADO = """
         border: none !important;
         border-radius: 20px !important;
         font-weight: 600 !important;
-        padding: 0.5rem 1.5rem !important;
     }
     [data-testid="stFileUploader"] button:hover {
         background: #1EBBEF !important;
     }
 
-    /* ═══ Botones ═══ */
     .stButton > button, .stDownloadButton > button {
         background: #1A3A5F;
         color: white;
@@ -224,9 +175,7 @@ CSS_PERSONALIZADO = """
         padding: 0.5rem 1.5rem;
         font-weight: 600;
         font-size: 0.9rem;
-        letter-spacing: 0.2px;
         transition: all 0.2s ease;
-        box-shadow: 0 1px 3px rgba(26, 58, 95, 0.1);
     }
     .stButton > button:hover, .stDownloadButton > button:hover {
         background: #1EBBEF;
@@ -240,70 +189,24 @@ CSS_PERSONALIZADO = """
         background: #1A3A5F;
     }
 
-    /* ═══ Alertas ═══ */
     .stAlert {
         border-radius: 10px;
         border-left-width: 4px;
-        padding: 1rem 1.25rem;
-    }
-    div[data-baseweb="notification"][kind="info"] {
-        background: #EEF7FD !important;
-        border-left-color: #1EBBEF !important;
-    }
-    div[data-baseweb="notification"][kind="success"] {
-        background: #F4FBE8 !important;
-        border-left-color: #C5E86C !important;
-    }
-    div[data-baseweb="notification"][kind="warning"] {
-        background: #FEF7EC !important;
-        border-left-color: #F5A623 !important;
-    }
-    div[data-baseweb="notification"][kind="error"] {
-        background: #FDEEEC !important;
-        border-left-color: #D8594B !important;
     }
 
-    /* ═══ Expanders ═══ */
     [data-testid="stExpander"] {
         background: white;
         border: 1px solid #E8EEF3;
         border-radius: 10px;
         margin-bottom: 1rem;
     }
-    [data-testid="stExpander"] summary {
-        color: #1A3A5F;
-        font-weight: 600;
-        padding: 1rem 1.25rem;
-    }
-    [data-testid="stExpander"] summary:hover {
-        color: #1EBBEF;
-    }
 
-    /* ═══ DataFrame ═══ */
     [data-testid="stDataFrame"] {
         border: 1px solid #E8EEF3;
         border-radius: 10px;
         overflow: hidden;
     }
 
-    /* ═══ Sliders ═══ */
-    .stSlider [data-baseweb="slider"] [role="slider"] {
-        background: #1EBBEF !important;
-        border: 3px solid white !important;
-        box-shadow: 0 2px 6px rgba(30, 187, 239, 0.4) !important;
-    }
-
-    /* ═══ Checkbox ═══ */
-    .stCheckbox label p {
-        color: #1A3A5F;
-    }
-
-    /* ═══ Spinner ═══ */
-    .stSpinner > div {
-        border-top-color: #1EBBEF !important;
-    }
-
-    /* ═══ Footer personalizado ═══ */
     .rex-footer {
         margin-top: 3rem;
         padding: 1.5rem 0;
@@ -315,11 +218,6 @@ CSS_PERSONALIZADO = """
     .rex-footer strong {
         color: #1EBBEF;
     }
-
-    /* ═══ Columns gap ═══ */
-    [data-testid="column"] {
-        padding: 0 0.5rem !important;
-    }
 </style>
 """
 
@@ -327,35 +225,29 @@ st.markdown(CSS_PERSONALIZADO, unsafe_allow_html=True)
 
 # Header con logo
 _logo_b64 = _cargar_logo_base64()
-_logo_img = (
-    f'<img src="data:image/png;base64,{_logo_b64}" class="rex-logo" alt="Rex+"/>'
-    if _logo_b64 else
-    '<div class="rex-logo" style="padding:8px 16px;color:#1EBBEF;font-weight:800;font-size:1.4rem;">Rex+</div>'
+if _logo_b64:
+    _logo_html = f'<img src="data:image/png;base64,{_logo_b64}" class="rex-logo" alt="Rex+"/>'
+else:
+    _logo_html = '<div class="rex-logo" style="color:#1EBBEF;font-weight:800;font-size:1.4rem;">Rex+</div>'
+
+_header_html = (
+    '<div class="rex-header">'
+    '<div class="rex-header-left">'
+    + _logo_html
+    + '<div class="rex-divider"></div>'
+    '<div class="rex-header-title">Validador de Empleados</div>'
+    '</div>'
+    '<div class="rex-header-badge">PRODUCCION</div>'
+    '</div>'
 )
 
-st.markdown(
-    f"""
-    <div class="rex-header">
-        <div class="rex-header-inner">
-            <div class="rex-header-left">
-                {_logo_img}
-                <div class="rex-divider"></div>
-                <div class="rex-header-title">Validador de Empleados</div>
-            </div>
-            <div class="rex-header-badge">PRODUCCIÓN</div>
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
+st.markdown(_header_html, unsafe_allow_html=True)
 
 st.markdown(
-    """
-    <div class="rex-hero">
-        <h1>📋 Validador de Empleados</h1>
-        <p>Sube el archivo Excel para validar y corregir automáticamente los datos antes de importarlos al sistema.</p>
-    </div>
-    """,
+    '<div class="rex-hero">'
+    '<h1>📋 Validador de Empleados</h1>'
+    '<p>Sube el archivo Excel para validar y corregir automáticamente los datos antes de importarlos al sistema.</p>'
+    '</div>',
     unsafe_allow_html=True,
 )
 
@@ -1116,10 +1008,6 @@ if archivo:
 
 # Footer
 st.markdown(
-    """
-    <div class="rex-footer">
-        Powered by <strong>Rex+</strong> · Validador de Empleados · v2.0
-    </div>
-    """,
+    '<div class="rex-footer">Powered by <strong>Rex+</strong> · Validador de Empleados · v2.0</div>',
     unsafe_allow_html=True,
 )

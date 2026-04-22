@@ -1,0 +1,14 @@
+[theme]
+# Paleta Rex+
+primaryColor             = "#1EBBEF"   # azul celeste del logo
+backgroundColor          = "#FFFFFF"   # fondo blanco
+secondaryBackgroundColor = "#F5F9FC"   # fondo secundario (cards, inputs)
+textColor                = "#1A3A5F"   # azul marino oscuro para texto
+font                     = "sans serif"
+
+[client]
+toolbarMode = "minimal"
+showErrorDetails = true
+
+[server]
+maxUploadSize = 200

@@ -74,7 +74,83 @@ EMAIL_DEFAULT    = "email@email.com"
 # ─────────────────────────────────────────────
 
 def _vacio(valor) -> bool:
-    return pd.isna(valor) or str(valor).strip() == ""
+    """Considera vacío: NaN, None real, string vacío, o strings 'None'/'nan'/'null'/'NaT'."""
+    if pd.isna(valor):
+        return True
+    s = str(valor).strip().lower()
+    return s == "" or s in {"none", "nan", "null", "nat", "<na>"}
+
+
+def reparar_mojibake(texto):
+    """Repara caracteres mal codificados (mojibake) como 'AVENDA√ëO' → 'AVENDAÑO'.
+
+    Esto ocurre cuando un archivo guardado en UTF-8 es interpretado como Mac Roman.
+    Se detecta por la presencia de caracteres marcadores típicos: √, Ã, ¬.
+    """
+    if _vacio(texto):
+        return texto
+    s = str(texto)
+    # Solo intentar reparar si hay marcadores típicos de mojibake
+    # √ y ¬ son típicos de macroman, Ã es típico de latin-1/windows
+    if "√" not in s and "Ã" not in s and "¬" not in s:
+        return s
+    try:
+        return s.encode("macroman").decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        try:
+            # Fallback: latin-1 → utf-8 (para otros tipos de mojibake de Windows)
+            return s.encode("latin-1").decode("utf-8")
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            return s  # No se pudo reparar, dejar como está
+
+
+def _normalizar_texto(texto) -> str:
+    """Quita tildes, pasa a minúsculas y limpia espacios."""
+    if _vacio(texto):
+        return ""
+    s = str(texto).strip().lower()
+    s = unicodedata.normalize("NFD", s)
+    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
+    return s
+
+
+# Índice inverso: nombre normalizado de comuna → código (construido una sola vez al cargar)
+_INDICE_NOMBRE_COMUNA = {}
+for _cod, _info in COMUNAS.items():
+    _nom_norm = _normalizar_texto(_info["nombre"]).replace(" ", "")
+    if _nom_norm and _nom_norm not in _INDICE_NOMBRE_COMUNA:
+        _INDICE_NOMBRE_COMUNA[_nom_norm] = _cod
+
+
+def resolver_comuna(valor):
+    """Convierte el valor de Comuna a un código de 5 dígitos si es posible.
+
+    Acepta:
+    - Código de 4 o 5 dígitos (ej: '1101', '13114') → aplica zfill
+    - Nombre de comuna en texto (ej: 'maipu', 'Las Condes') → busca en el maestro
+
+    Retorna (codigo, cambio_realizado) donde cambio_realizado es un string descriptivo o None.
+    """
+    if _vacio(valor):
+        return valor, None
+
+    original = str(valor).strip()
+
+    # Caso 1: es un número (código)
+    if original.isdigit():
+        codigo = original.zfill(5)
+        if codigo != original and codigo in COMUNAS:
+            return codigo, f"Código completado con ceros: '{original}' → '{codigo}'"
+        return codigo, None
+
+    # Caso 2: es texto (nombre de comuna)
+    nombre_norm = _normalizar_texto(original).replace(" ", "")
+    if nombre_norm in _INDICE_NOMBRE_COMUNA:
+        codigo = _INDICE_NOMBRE_COMUNA[nombre_norm]
+        return codigo, f"Comuna convertida de nombre a código: '{original}' → '{codigo}' ({COMUNAS[codigo]['nombre']})"
+
+    # No se pudo resolver, devolver tal cual (se reportará como error después)
+    return original, None
 
 
 def convertir_fecha(valor):
@@ -193,16 +269,6 @@ def normalizar_telefono(valor):
 
     cambio = "ya_ok" if formateado == original else "normalizado"
     return formateado, cambio, True
-
-
-def _normalizar_texto(texto) -> str:
-    """Quita tildes, pasa a minúsculas y limpia espacios."""
-    if _vacio(texto):
-        return ""
-    s = str(texto).strip().lower()
-    s = unicodedata.normalize("NFD", s)
-    s = "".join(c for c in s if unicodedata.category(c) != "Mn")
-    return s
 
 
 def _normalizar_region(texto) -> str:
@@ -324,6 +390,16 @@ def procesar_archivo(uploaded_file):
     df = pd.read_excel(uploaded_file, sheet_name="Empleados", dtype=str)
     total_original = len(df)
 
+    # ───── Reparar caracteres corruptos (mojibake) en headers y celdas ─────
+    # Ej: "AVENDA√ëO" → "AVENDAÑO", "tel√©fono" → "teléfono"
+    mojibake_reparados = 0
+    df.columns = [reparar_mojibake(c) for c in df.columns]
+    for col in df.columns:
+        if df[col].dtype == object:  # solo columnas de texto
+            antes = df[col].copy()
+            df[col] = df[col].apply(reparar_mojibake)
+            mojibake_reparados += (antes.fillna("") != df[col].fillna("")).sum()
+
     # Filtrar solo empleados activos
     if "Situación" in df.columns:
         df = df[df["Situación"].str.strip().str.upper() == "A"].reset_index(drop=True)
@@ -341,6 +417,7 @@ def procesar_archivo(uploaded_file):
         "direcciones_limpiadas":     0,
         "regiones_corregidas":       0,
         "ciudades_corregidas":       0,
+        "caracteres_reparados":      int(mojibake_reparados),
     }
 
     # Lista de correcciones de ubicación hechas (para el reporte)
@@ -373,12 +450,11 @@ def procesar_archivo(uploaded_file):
             df[campo] = df[campo].apply(limpiar_direccion)
             correcciones["direcciones_limpiadas"] += (antes.fillna("") != df[campo].fillna("")).sum()
 
-    # ───── Comuna (zfill 5) ─────
+    # ───── Comuna: resolver nombre → código y aplicar zfill(5) ─────
     if "Comuna" in df.columns:
         antes = df["Comuna"].copy()
-        df["Comuna"] = df["Comuna"].apply(
-            lambda x: str(x).strip().zfill(5) if pd.notna(x) and str(x).strip() != "" else x
-        )
+        resultados = df["Comuna"].apply(resolver_comuna)
+        df["Comuna"] = resultados.apply(lambda r: r[0])
         correcciones["comunas_rellenadas"] = (antes.fillna("") != df["Comuna"].fillna("")).sum()
 
     # ───── Emails ─────
@@ -505,6 +581,14 @@ def procesar_archivo(uploaded_file):
         if campos_vacios or errores_fila:
             errores.append((num_fila, campos_vacios, errores_fila))
 
+    # ───── Limpieza final: reemplazar valores nulos visibles por string vacío ─────
+    # pandas convierte NaN/None a string "None" o "nan" cuando exportamos a Excel
+    # o mostramos en streamlit. Los reemplazamos por "" para que queden en blanco.
+    df = df.fillna("")
+    for col in df.columns:
+        if df[col].dtype == object:
+            df[col] = df[col].astype(str).apply(lambda v: "" if _vacio(v) else v)
+
     return df, errores, total_original, filas_eliminadas, correcciones, correcciones_ubicacion
 
 
@@ -544,6 +628,12 @@ if archivo:
             c1, c2 = st.columns(2)
             c1.metric("🗺️ Regiones corregidas",         correcciones["regiones_corregidas"])
             c2.metric("🏙️ Ciudades corregidas",         correcciones["ciudades_corregidas"])
+
+            if correcciones["caracteres_reparados"] > 0:
+                st.info(
+                    f"🔤 Se repararon **{correcciones['caracteres_reparados']}** celda(s) "
+                    f"con caracteres corruptos (ej: 'AVENDA√ëO' → 'AVENDAÑO')."
+                )
 
             # Panel de correcciones de ubicación (detalle)
             if correcciones_ubicacion:

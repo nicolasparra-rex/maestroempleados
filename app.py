@@ -156,23 +156,34 @@ def resolver_comuna(valor):
 def convertir_fecha(valor):
     if _vacio(valor):
         return valor
-    valor_str = str(valor).strip()
-    # Si viene como datetime desde Excel
-    try:
-        if isinstance(valor, (pd.Timestamp, datetime)):
+
+    # Si ya viene como datetime de pandas/python, formatear directo
+    if isinstance(valor, (pd.Timestamp, datetime)):
+        try:
             return valor.strftime("%d-%m-%Y")
-    except Exception:
-        pass
+        except Exception:
+            pass
+
+    valor_str = str(valor).strip()
+
+    # Si viene con timestamp tipo "1972-01-24 00:00:00", quedarse solo con la parte de fecha
+    if " " in valor_str:
+        valor_str = valor_str.split(" ")[0]
+
+    # Si ya está en el formato deseado, retornar tal cual
     try:
         datetime.strptime(valor_str, "%d-%m-%Y")
         return valor_str
     except ValueError:
         pass
+
+    # Probar los distintos formatos posibles
     for fmt in formatos_posibles:
         try:
             return datetime.strptime(valor_str, fmt).strftime("%d-%m-%Y")
         except ValueError:
             continue
+
     return valor
 
 
@@ -292,9 +303,10 @@ def _normalizar_region(texto) -> str:
 def corregir_ubicacion(codigo_comuna, region_escrita, ciudad_escrita):
     """Corrige región y ciudad tomando la comuna como fuente de verdad.
 
+    - Region final: siempre código de 2 dígitos con cero (ej: "13", "05")
+    - Ciudad final: siempre cod_ciudad del maestro (ej: "LasCondes", "Maipu")
+
     Retorna una tupla (region_corregida, ciudad_corregida, cambios, error).
-    - cambios: lista de strings describiendo qué se corrigió (puede estar vacía).
-    - error: string con el error si la comuna no existe, o None.
     """
     cambios = []
 
@@ -312,23 +324,29 @@ def corregir_ubicacion(codigo_comuna, region_escrita, ciudad_escrita):
 
     info = COMUNAS[codigo]
     nom_comuna    = info["nombre"]
-    cod_region_of = info["cod_region"]
-    nom_region_of = info["nom_region"]
-    cod_ciudad_of = info["cod_ciudad"]
+    cod_region_of = info["cod_region"]      # ej: "13"
+    nom_region_of = info["nom_region"]      # ej: "Metropolitana de Santiago"
+    cod_ciudad_of = info["cod_ciudad"]      # ej: "LasCondes"
 
-    # ─── Verificar y corregir región ───
-    region_final = region_escrita
-    if not _vacio(region_escrita):
+    # ─── Verificar y corregir región (siempre dejar código 2 dígitos) ───
+    region_final = cod_region_of  # valor oficial por defecto
+
+    if _vacio(region_escrita):
+        cambios.append(f"Región completada: → '{cod_region_of}' (desde Comuna {nom_comuna})")
+    else:
         region_str = str(region_escrita).strip()
         region_ok = False
 
-        if region_str.isdigit():
-            region_ok = region_str.zfill(2) == cod_region_of
+        # Ya es el código correcto
+        if region_str.isdigit() and region_str.zfill(2) == cod_region_of:
+            region_ok = True
         else:
+            # Si empieza con dígitos (formato "XX-nombre"), extraer código
             prefijo = region_str[:2] if region_str[:2].isdigit() else None
             if prefijo and prefijo.zfill(2) == cod_region_of:
                 region_ok = True
             else:
+                # Comparar por nombre normalizado
                 escrita_norm = _normalizar_region(region_str)
                 oficial_norm = _normalizar_region(nom_region_of)
                 esc_sin_esp  = escrita_norm.replace(" ", "")
@@ -342,42 +360,51 @@ def corregir_ubicacion(codigo_comuna, region_escrita, ciudad_escrita):
                     or ofi_sin_esp in esc_sin_esp
                 )
 
-        if not region_ok:
-            region_final = nom_region_of
+        # Si la región escrita era válida, igual la normalizamos al código de 2 dígitos
+        if region_ok:
+            if region_str.zfill(2) != cod_region_of:
+                cambios.append(
+                    f"Región normalizada a código: '{region_escrita}' → '{cod_region_of}'"
+                )
+        else:
             cambios.append(
-                f"Región corregida: '{region_escrita}' → '{nom_region_of}' "
+                f"Región corregida: '{region_escrita}' → '{cod_region_of}' "
                 f"(porque Comuna es {nom_comuna} [{codigo}])"
             )
-    else:
-        # Si venía vacía, la completamos
-        region_final = nom_region_of
-        cambios.append(f"Región completada: → '{nom_region_of}' (desde Comuna {nom_comuna})")
 
-    # ─── Verificar y corregir ciudad ───
-    ciudad_final = ciudad_escrita
-    if cod_ciudad_of:  # Si la comuna tiene ciudad asociada en el maestro
-        if not _vacio(ciudad_escrita):
+    # ─── Verificar y corregir ciudad (siempre dejar cod_ciudad del maestro) ───
+    ciudad_final = cod_ciudad_of if cod_ciudad_of else ciudad_escrita
+
+    if cod_ciudad_of:
+        if _vacio(ciudad_escrita):
+            cambios.append(f"Ciudad completada: → '{cod_ciudad_of}' (desde Comuna {nom_comuna})")
+        else:
             ciudad_str = str(ciudad_escrita).strip()
             esc_norm = _normalizar_texto(ciudad_str).replace(" ", "").replace("-", "").replace("_", "")
             of_norm  = _normalizar_texto(cod_ciudad_of).replace(" ", "").replace("-", "").replace("_", "")
             nom_norm = _normalizar_texto(info["nom_ciudad"]).replace(" ", "").replace("-", "").replace("_", "")
 
+            # Aceptar si coincide con código de ciudad oficial o con el nombre (también
+            # formatos "05-los_andes_calle_larga" donde el texto después del "-" contiene
+            # el nombre de la ciudad)
             ciudad_ok = (
                 esc_norm == of_norm
                 or esc_norm == nom_norm
                 or of_norm in esc_norm
+                or nom_norm in esc_norm
                 or esc_norm in of_norm
             )
 
-            if not ciudad_ok:
-                ciudad_final = cod_ciudad_of
+            if ciudad_ok:
+                if ciudad_str != cod_ciudad_of:
+                    cambios.append(
+                        f"Ciudad normalizada: '{ciudad_escrita}' → '{cod_ciudad_of}'"
+                    )
+            else:
                 cambios.append(
                     f"Ciudad corregida: '{ciudad_escrita}' → '{cod_ciudad_of}' "
                     f"(porque Comuna es {nom_comuna} [{codigo}])"
                 )
-        else:
-            ciudad_final = cod_ciudad_of
-            cambios.append(f"Ciudad completada: → '{cod_ciudad_of}' (desde Comuna {nom_comuna})")
 
     return region_final, ciudad_final, cambios, None
 
